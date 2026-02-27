@@ -5,8 +5,16 @@ set -e
 dl_extract() {
 	_archive="${1##*/}"
 	_extract_dir="${_archive%.*}"
+	_checksum="$2"
 
 	curl -fLo "$_archive" "$1"
+
+	if [ -n "$_checksum" ]; then
+		printf '%s  %s\n' "$_checksum" "$_archive" | sha256sum -c >&2
+	else
+		printf 'warning: no checksum provided for %s; archive will not be verified\n' "$_archive" >&2
+	fi
+
 	mkdir -p "$_extract_dir"
 
 	case "$_archive" in
@@ -20,6 +28,15 @@ dl_extract() {
 
 	rm "$_archive"
 	printf '%s' "$_extract_dir"
+}
+
+gh_release_data() {
+	_repo="$1"
+	_version="$2"
+	_fname_filter="$3"
+
+	curl -s "https://api.github.com/repos/$_repo/releases/$_version" |
+		jq -r ".assets[] | select(.name | contains(\"$_fname_filter\")) | .browser_download_url, (.digest | ltrimstr(\"sha256:\"))"
 }
 
 tmp_dir=$(mktemp -d)
@@ -46,15 +63,26 @@ curl -fLO https://raw.githubusercontent.com/ryanpz/zig-swap/refs/heads/main/zig-
 chmod +x zig-swap
 cp zig-swap "$install_prefix"/bin
 
-nvim_dir="$(dl_extract https://github.com/neovim/neovim/releases/download/nightly/nvim-linux-x86_64.tar.gz)"
+nvim_data="$(gh_release_data 'neovim/neovim' 'tags/nightly' 'nvim-linux-x86_64.tar.gz')"
+nvim_dir="$(dl_extract \
+	"$(printf '%s' "$nvim_data" | head -n1)" \
+	"$(printf '%s' "$nvim_data" | head -n2 | tail -n1)")"
 cp -r "$nvim_dir"/nvim-*/bin "$nvim_dir"/nvim-*/lib "$nvim_dir"/nvim-*/share "$install_prefix"
 
-emmylua_dir="$(dl_extract https://github.com/EmmyLuaLs/emmylua-analyzer-rust/releases/latest/download/emmylua_ls-linux-x64.tar.gz)"
+emmylua_data="$(gh_release_data 'EmmyLuaLs/emmylua-analyzer-rust' 'latest' 'emmylua_ls-linux-x64.tar.gz')"
+emmylua_dir="$(dl_extract \
+	"$(printf '%s' "$emmylua_data" | head -n1)" \
+	"$(printf '%s' "$emmylua_data" | head -n2 | tail -n1)")"
 cp "$emmylua_dir"/emmylua_ls "$install_prefix"/bin
 
-jj_latest_url="$(curl -s https://api.github.com/repos/jj-vcs/jj/releases/latest | jq -r '.assets[] | select(.name | contains("x86_64-unknown-linux")) | .browser_download_url' | head -1)"
-jj_dir="$(dl_extract "$jj_latest_url")"
+jj_data="$(gh_release_data 'jj-vcs/jj' 'latest' 'x86_64-unknown-linux-musl')"
+jj_dir="$(dl_extract \
+	"$(printf '%s' "$jj_data" | head -n1)" \
+	"$(printf '%s' "$jj_data" | head -n2 | tail -n1)")"
 cp "$jj_dir"/jj "$install_prefix"/bin
 
-stylua_dir="$(dl_extract https://github.com/JohnnyMorganz/StyLua/releases/latest/download/stylua-linux-x86_64.zip)"
+stylua_data="$(gh_release_data 'JohnnyMorganz/StyLua' 'latest' 'stylua-linux-x86_64.zip')"
+stylua_dir="$(dl_extract \
+	"$(printf '%s' "$stylua_data" | head -n1)" \
+	"$(printf '%s' "$stylua_data" | head -n2 | tail -n1)")"
 cp "$stylua_dir"/stylua "$install_prefix"/bin
