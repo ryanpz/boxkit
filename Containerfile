@@ -6,5 +6,7 @@ RUN dnf5 upgrade -y && \
 RUN /install-devtools
 RUN rm /extra-packages /install-devtools
 
-RUN ln -fs /usr/bin/distrobox-host-exec /usr/local/bin/podman
-RUN ln -fs /usr/bin/distrobox-host-exec /usr/local/bin/xdg-open
+RUN ln -fs /usr/bin/distrobox-host-exec /usr/local/bin/podman && \
+    ln -fs /usr/bin/distrobox-host-exec /usr/local/bin/xdg-open
+
+COPY rust.sh /etc/profile.d/devbox-rust.sh
